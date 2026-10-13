@@ -1,0 +1,85 @@
+# The whole system: docker compose up --build  ->  http://localhost:8080 (Eureka dashboard on :8761)
+# Only the gateway (and the Eureka dashboard) are published; the services and MySQL are reachable
+# only inside this Docker network.
+
+x-service: &service
+  restart: unless-stopped
+  depends_on:
+    mysql:
+      condition: service_healthy
+    discovery-server:
+      condition: service_healthy
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      USERS_DB_PASSWORD: ${USERS_DB_PASSWORD:-users-pass}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog-pass}
+      ORDERS_DB_PASSWORD: ${ORDERS_DB_PASSWORD:-orders-pass}
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/mysql-init.sh:/docker-entrypoint-initdb.d/01-databases.sh:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  discovery-server:
+    build: { context: ., args: { MODULE: discovery-server } }
+    environment:
+      PORT: 8761
+    ports:
+      - "8761:8761"
+
+  user-service:
+    <<: *service
+    build: { context: ., args: { MODULE: user-service } }
+    environment:
+      PORT: 8081
+      DB_URL: jdbc:mysql://mysql:3306/buchhaus_users?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: user_svc
+      DB_PASSWORD: ${USERS_DB_PASSWORD:-users-pass}
+      EUREKA_URL: http://discovery-server:8761/eureka
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string-of-32-chars}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@buchhaus.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@12345}
+      DEMO_DATA: ${DEMO_DATA:-true}
+
+  catalog-service:
+    <<: *service
+    build: { context: ., args: { MODULE: catalog-service } }
+    environment:
+      PORT: 8082
+      DB_URL: jdbc:mysql://mysql:3306/buchhaus_catalog?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: catalog_svc
+      DB_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog-pass}
+      EUREKA_URL: http://discovery-server:8761/eureka
+
+  order-service:
+    <<: *service
+    build: { context: ., args: { MODULE: order-service } }
+    environment:
+      PORT: 8083
+      DB_URL: jdbc:mysql://mysql:3306/buchhaus_orders?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: order_svc
+      DB_PASSWORD: ${ORDERS_DB_PASSWORD:-orders-pass}
+      EUREKA_URL: http://discovery-server:8761/eureka
+
+  api-gateway:
+    restart: unless-stopped
+    build: { context: ., args: { MODULE: api-gateway } }
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      EUREKA_URL: http://discovery-server:8761/eureka
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string-of-32-chars}
+    ports:
+      - "8080:8080"
+
+volumes:
+  db-data:

@@ -1,0 +1,56 @@
+server:
+  port: ${PORT:8081}
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: user-service
+  datasource:
+    # H2 in MySQL mode for running one service on its own; docker compose switches to MySQL.
+    url: ${DB_URL:jdbc:h2:mem:users;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.type.preferred_instant_jdbc_type: TIMESTAMP
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+app:
+  demo-data: ${DEMO_DATA:true}
+  admin:
+    email: ${ADMIN_EMAIL:admin@buchhaus.local}
+    password: ${ADMIN_PASSWORD:Admin@12345}
+  jwt:
+    # Must match the gateway's secret. Override in every real deployment (at least 32 characters).
+    secret: ${JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}
+    expiry-minutes: ${JWT_EXPIRY_MINUTES:1440}

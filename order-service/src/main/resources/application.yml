@@ -1,0 +1,83 @@
+server:
+  port: ${PORT:8083}
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: order-service
+  datasource:
+    # H2 in MySQL mode for running one service on its own; docker compose switches to MySQL.
+    url: ${DB_URL:jdbc:h2:mem:orders;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.type.preferred_instant_jdbc_type: TIMESTAMP
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+spring.cloud.openfeign:
+  client:
+    config:
+      catalog-service:
+        connect-timeout: 2000
+        read-timeout: 3000
+
+resilience4j:
+  retry:
+    instances:
+      catalog:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        # 4xx answers (sold out, no such book) are final, and an open breaker means "don't call":
+        # neither is retried. Timeouts, refused connections and 5xx are.
+        ignore-exceptions:
+          - com.buchhaus.common.ApiException
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+  circuitbreaker:
+    instances:
+      catalog:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - com.buchhaus.common.ApiException
+
+app:
+  # How often unconfirmed stock reservations are confirmed again after a catalogue outage.
+  confirm-retry-ms: ${CONFIRM_RETRY_MS:60000}

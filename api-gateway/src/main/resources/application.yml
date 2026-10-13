@@ -1,0 +1,50 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 15s
+      # Same public paths as the monolith, so the web front end did not change.
+      routes:
+        - id: users
+          uri: lb://user-service
+          predicates:
+            - Path=/api/auth/**,/api/me
+        - id: catalog
+          uri: lb://catalog-service
+          predicates:
+            - Path=/api/books,/api/books/**,/api/genres,/api/admin/books,/api/admin/books/**
+        - id: orders
+          uri: lb://order-service
+          predicates:
+            - Path=/api/cart,/api/cart/**,/api/orders,/api/orders/**,/api/admin/orders,/api/admin/orders/**,/api/admin/stats
+      # No route for /internal/**: the services' internal API cannot be reached from outside.
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+
+app:
+  jwt:
+    # Must match the user-service's secret (at least 32 characters). Override in every real deployment.
+    secret: ${JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}
+    expiry-minutes: ${JWT_EXPIRY_MINUTES:1440}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

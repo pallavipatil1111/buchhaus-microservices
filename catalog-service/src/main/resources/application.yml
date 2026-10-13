@@ -1,0 +1,51 @@
+server:
+  port: ${PORT:8082}
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: catalog-service
+  datasource:
+    # H2 in MySQL mode for running one service on its own; docker compose switches to MySQL.
+    url: ${DB_URL:jdbc:h2:mem:catalog;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.type.preferred_instant_jdbc_type: TIMESTAMP
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+app:
+  # Stock held for a checkout that was never confirmed (order-service crashed mid-checkout) is
+  # released after this long.
+  reservation-timeout-minutes: ${RESERVATION_TIMEOUT_MINUTES:30}
