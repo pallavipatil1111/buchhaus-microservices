@@ -33,6 +33,7 @@ final class CatalogFixture {
         });
         when(books.findById(any())).thenAnswer(inv -> Optional.ofNullable(bookRows.get((Long) inv.getArgument(0))));
         when(books.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(reservations.findById(any())).thenAnswer(inv -> Optional.ofNullable(reservationRows.get((String) inv.getArgument(0))));
         when(reservations.lockById(any())).thenAnswer(inv -> Optional.ofNullable(reservationRows.get((String) inv.getArgument(0))));
         when(reservations.save(any())).thenAnswer(inv -> {
             Reservation r = inv.getArgument(0);

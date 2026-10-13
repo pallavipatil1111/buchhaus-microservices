@@ -40,7 +40,10 @@ public class StockService {
 
     @Transactional
     public ReservationView reserve(ReserveRequest request) {
-        Optional<Reservation> existing = reservations.lockById(request.reservationId());
+        // A plain read, not SELECT ... FOR UPDATE: locking a row that does not exist yet takes a gap
+        // lock in MySQL, and two checkouts holding gap locks then deadlock on their inserts. The
+        // primary key still guarantees one reservation per id.
+        Optional<Reservation> existing = reservations.findById(request.reservationId());
         if (existing.isPresent()) {
             // A retry of a request that already succeeded: return the same answer, take nothing twice.
             if (existing.get().getStatus() == ReservationStatus.RELEASED) {
